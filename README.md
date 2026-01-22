@@ -1,6 +1,8 @@
-# DARA – Decision Aid & Referral Assistant
+![DARA logo](assets/logo_DARA_info.png)
 
-DARA (Decision Aid & Referral Assistant) is an educational clinical decision-support tool designed to help physicians decide whether a patient should be referred to genetic counseling.
+# DARA – Decision Aid for Genetic Referral
+
+DARA (Decision Aid for Genetic Referral) is an educational clinical decision-support tool designed to help physicians decide whether a patient should be referred to genetic counseling.
 
 The system is not a diagnostic tool and does not replace medical judgment.  
 It supports clinicians by structuring clinical information, highlighting relevant elements, and providing an explainable triage recommendation.

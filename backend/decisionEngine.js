@@ -217,6 +217,47 @@ function detectFlagsAndScore(payload) {
   const reasons = [];
   let score = 0;
 
+// -------------------------
+// Oncogenetics quick high-risk rules (MVP improvement)
+// -------------------------
+const chief = (payload.chief_concern || "").toLowerCase();
+const notes = (payload.clinical_notes || "").toLowerCase();
+const fhx = (payload.family_history_summary || "").toLowerCase();
+
+// Combine free-text fields for simple keyword matching
+const textAll = `${chief} ${notes} ${fhx}`;
+
+// Rule A: Pancreatic cancer is a strong genetic referral indication
+if (pathway === "oncogenetics" && (textAll.includes("pancreatic") || textAll.includes("pancreas"))) {
+  score += 45;
+  reasons.push("Pancreatic cancer is a high-risk indication for genetic referral.");
+  suggested_flags.push("pancreatic_cancer");
+}
+// Rule A2: Pancreatic cancer + melanoma pattern  
+if (pathway === "oncogenetics" && (textAll.includes("pancreatic") || textAll.includes("pancreas")) && textAll.includes("melanoma")) {
+  score += 15;
+  reasons.push("Pancreatic cancer with melanoma in the family may suggest a hereditary syndrome (e.g., CDKN2A/FAMMM).");
+  suggested_flags.push("pancreas_melanoma_pattern");
+}
+
+// Rule B: Early-onset cancer (simple proxy using patient age)
+// If patient is under 50 and cancer is mentioned, raise priority
+if (pathway === "oncogenetics" && payload.patient_age && payload.patient_age < 50 && textAll.includes("cancer")) {
+  score += 30;
+  reasons.push("Early-onset cancer (under age 50) increases suspicion of hereditary cancer risk.");
+  suggested_flags.push("early_onset_cancer");
+}
+// -------------------------
+// Generic rule: family history entered → reason
+// -------------------------
+if (payload.family_history_summary && payload.family_history_summary.trim() !== "") {
+  reasons.push(
+    "Family history information provided and should be considered in the genetic assessment."
+  );
+}
+
+
+  // Apply rules
   for (const r of rules) {
     const hit = r.patterns.some((p) => text.includes(p));
     if (hit) {

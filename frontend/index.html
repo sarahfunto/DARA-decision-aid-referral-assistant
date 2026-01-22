@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Genetic Referral Assistant (MVP)</title>
+  <title>DARA – Decision Aid for Genetic Referral</title>
   <style>
     body { font-family: Arial, sans-serif; max-width: 900px; margin: 24px auto; padding: 0 16px; }
     .card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
@@ -37,13 +37,38 @@
   color: #d93025;
   font-weight: bold;
 }
+    .header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
 
+    .header h1 {
+  margin: 2px 0 0 0;
+}
+
+    .header .muted {
+  margin: 2px 0 0 0;
+}
+    .logo {
+  width: 260px;
+  height: auto;
+  margin: 0;
+  padding: 0;
+}
   </style>
 </head>
 <body>
 
-  <h1>Genetic Referral Assistant (MVP)</h1>
-  <p class="muted">Educational triage tool — not a clinical decision.</p>
+<div class="header">
+  <img src="../assets/logo_dara_info.png" alt="DARA logo" class="logo" />
+  <h1>DARA – Decision Aid for Genetic Referral </h1>
+  <p class="muted">
+    An educational decision-support tool to assist genetic referral decisions
+</div>
 
   <div class="card">
     <h2>Clinical Form</h2>
