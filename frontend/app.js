@@ -1,0 +1,568 @@
+// app.js — Option A (complete): auto-detect flags + physician confirms via checkboxes
+const API_BASE = "http://localhost:3001";
+
+const pathwayEl = document.getElementById("pathway");
+const prenatalSection = document.getElementById("prenatal_section");
+const pediatricSection = document.getElementById("pediatric_section");
+
+// (Optional) these might not exist in your HTML — we use ?. to be safe
+const pregnancyStatusEl = document.getElementById("pregnancy_status");
+const gestWeeksLabel = document.querySelector('label[for="gestational_weeks"]');
+const gestWeeksInput = document.getElementById("gestational_weeks");
+
+let lastPayload = null;
+let lastResponse = null;
+
+// -------------------------
+// UI toggles
+// -------------------------
+function toggleSections() {
+  const p = pathwayEl.value;
+  prenatalSection?.classList.toggle("hidden", p !== "prenatal");
+  pediatricSection?.classList.toggle("hidden", p !== "pediatric");
+}
+
+function toggleGestationalWeeks() {
+  const isPrenatal = pathwayEl.value === "prenatal";
+  const isPregnant = (pregnancyStatusEl?.value || "") === "pregnant";
+
+  const show = isPrenatal && isPregnant;
+
+  // Show/hide label + input together
+  if (gestWeeksLabel) gestWeeksLabel.classList.toggle("hidden", !show);
+  if (gestWeeksInput) gestWeeksInput.classList.toggle("hidden", !show);
+
+  // If not shown, clear value to avoid confusion
+  if (!show && gestWeeksInput) gestWeeksInput.value = "";
+}
+
+pathwayEl?.addEventListener("change", () => {
+  toggleSections();
+  toggleGestationalWeeks();
+});
+
+pregnancyStatusEl?.addEventListener("change", toggleGestationalWeeks);
+
+toggleSections();
+toggleGestationalWeeks();
+
+// -------------------------
+// Utilities
+// -------------------------
+function csvToList(value) {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function showError(msg) {
+  const el = document.getElementById("form_error");
+  if (!el) return;
+  el.textContent = msg || "";
+  el.classList.toggle("hidden", !msg);
+}
+
+function hideSummary() {
+  document.getElementById("summary_card")?.classList.add("hidden");
+  const pre = document.getElementById("summaryText");
+  if (pre) pre.textContent = "";
+}
+
+function showSummary(text) {
+  const card = document.getElementById("summary_card");
+  const pre = document.getElementById("summaryText");
+  if (pre) pre.textContent = text;
+  card?.classList.remove("hidden");
+}
+
+// -------------------------
+// Payload builders
+// -------------------------
+function buildPayloadFromForm() {
+  const payload = {
+    pathway: document.getElementById("pathway")?.value || "",
+
+    patient_file_number: document.getElementById("patient_file_number")?.value.trim() || "",
+
+    patient_age: Number(document.getElementById("patient_age")?.value) || null,
+    patient_sex: document.getElementById("patient_sex")?.value || "unknown",
+
+    chief_concern: document.getElementById("chief_concern")?.value.trim() || "",
+    clinical_notes: document.getElementById("clinical_notes")?.value.trim() || "",
+    family_history_summary: document.getElementById("family_history_summary")?.value.trim() || "",
+
+    // These might remain in your HTML — ok to keep
+    family_history_red_flags: csvToList(document.getElementById("family_history_red_flags")?.value || ""),
+
+    pregnancy_status: document.getElementById("pregnancy_status")?.value || "not_applicable",
+    gestational_weeks: Number(document.getElementById("gestational_weeks")?.value) || null,
+
+    // If your input is free text, we still pass it as a list by splitting commas
+    prenatal_findings: csvToList(document.getElementById("prenatal_findings")?.value || ""),
+    pediatric_red_flags: csvToList(document.getElementById("pediatric_red_flags")?.value || ""),
+    hpo_terms: csvToList(document.getElementById("hpo_terms")?.value || ""),
+  };
+
+  return payload;
+}
+
+function validatePayload(payload) {
+  // You requested: age and sex mandatory
+  if (!payload.pathway) return "Please choose a pathway.";
+  if (!payload.patient_age) return "Please fill in Patient age.";
+  if (!payload.patient_sex || payload.patient_sex === "unknown") return "Please choose Patient sex.";
+  if (!payload.chief_concern) return "Please fill in Chief concern.";
+
+  // Prenatal pregnant => gestational weeks recommended / can be required
+  if (payload.pathway === "prenatal" && payload.pregnancy_status === "pregnant") {
+    if (!payload.gestational_weeks) return "Please fill in Gestational age (weeks).";
+  }
+
+  return null;
+}
+
+// -------------------------
+// Rendering
+// -------------------------
+function renderSuggestedFlags(data) {
+  const flags = data.suggested_flags || [];
+  if (!flags.length) {
+    return `<p class="muted">No suggested flags detected.</p>`;
+  }
+
+  // All checked by default (doctor can uncheck)
+  const boxes = flags
+    .map(
+      (f) => `
+      <label style="display:block; margin:6px 0;">
+        <input type="checkbox" class="flagBox" value="${f}" checked />
+        ${f}
+      </label>
+    `
+    )
+    .join("");
+
+  return `
+    <div class="card" style="margin-top:12px;">
+      <h3 style="margin-top:0;">Suggested red flags (auto-detected)</h3>
+      <p class="muted" style="margin-top:4px;">
+        Please confirm the flags. Uncheck any irrelevant ones, then click <b>Recalculate</b>.
+      </p>
+      <div id="flagsBox">${boxes}</div>
+      <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+        <button type="button" id="recalcBtn">Recalculate (confirmed flags)</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderResult(data) {
+  const empty = document.getElementById("result_empty");
+  const result = document.getElementById("result");
+  if (!result) return;
+
+  empty?.classList.add("hidden");
+  result.classList.remove("hidden");
+
+  const reasons = (data.reasons || []).map((r) => `<li>${r}</li>`).join("");
+  const missing = (data.missing_info || []).map((m) => `<li>${m}</li>`).join("");
+  const steps = (data.next_steps || []).map((s) => `<li>${s}</li>`).join("");
+
+  const fileNum = lastPayload?.patient_file_number || "";
+
+  result.className = `card triage-${data.triage}`;
+  result.innerHTML = `
+    <div style="display:flex; flex-wrap:wrap; gap:8px;">
+      ${fileNum ? `<span class="pill"><b>File #:</b> ${fileNum}</span>` : ""}
+      <span class="pill"><b>Pathway:</b> ${data.pathway}</span>
+      <span class="pill"><b>Triage:</b> ${data.triage}</span>
+      <span class="pill"><b>Score:</b> ${data.priority_score}/100</span>
+      ${
+        data.pathway === "prenatal"
+          ? `<span class="pill time-sensitive">⏱️ Time-sensitive</span>`
+          : ""
+      }
+    </div>
+
+    ${
+      data.pathway === "prenatal"
+        ? `<p class="muted" style="margin-top:6px;">
+             <b>Discuss urgently:</b> prenatal cases are time-sensitive and should be reviewed promptly.
+           </p>`
+        : ""
+    }
+
+    <h3>Reasons</h3><ul>${reasons || "<li>None</li>"}</ul>
+    <h3>Missing information</h3><ul>${missing || "<li>None</li>"}</ul>
+    <h3>Next steps</h3><ul>${steps || "<li>None</li>"}</ul>
+
+    ${
+      data.pathway === "prenatal"
+        ? `
+          <h3>⏱️ Prenatal – Information to prepare before genetic counseling</h3>
+          <ul>
+            <li>Gestational age at the time of referral</li>
+            <li>Detailed ultrasound report (date, findings, severity)</li>
+            <li>Results of prenatal screening tests (first trimester screening, NIPT, serum screening)</li>
+            <li>Any invasive testing already performed (CVS, amniocentesis)</li>
+            <li>Family history of genetic conditions or congenital anomalies</li>
+            <li>Previous affected pregnancies or children</li>
+            <li>Consanguinity (if applicable)</li>
+          </ul>
+          <p class="muted">
+            Preparing this information early helps avoid delays in time-sensitive prenatal situations.
+          </p>
+        `
+        : ""
+    }
+
+    ${renderSuggestedFlags(data)}
+
+    <p class="muted"><small>${data.disclaimer || ""}</small></p>
+  `;
+
+  // If you have a "summary_actions" container that you want to show after a result:
+  document.getElementById("summary_actions")?.classList.remove("hidden");
+
+  // Wire up recalc button (exists only after renderSuggestedFlags)
+  const recalcBtn = document.getElementById("recalcBtn");
+  recalcBtn?.addEventListener("click", async () => {
+    showError("");
+
+    if (!lastPayload) {
+      showError("No previous case found. Please submit a case first.");
+      return;
+    }
+
+    const confirmed = Array.from(document.querySelectorAll(".flagBox:checked")).map(
+      (cb) => cb.value
+    );
+
+    const payload2 = { ...lastPayload, confirmed_flags: confirmed };
+
+    try {
+      const res = await fetch(`${API_BASE}/cases`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload2),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        showError(err.error || "API error");
+        return;
+      }
+
+      const data2 = await res.json();
+      lastPayload = payload2;
+      lastResponse = data2;
+      renderResult(data2);
+    } catch {
+      showError("Cannot reach the API. Make sure the backend is running on port 3001.");
+    }
+  });
+}
+
+// -------------------------
+// Referral summary (text)
+// -------------------------
+function buildReferralSummary(payload, data) {
+  const fileNum = payload?.patient_file_number || "";
+
+  const createdAt = data.created_at
+    ? new Date(data.created_at).toLocaleString()
+    : new Date().toLocaleString();
+
+  const lines = [];
+  lines.push("Genetic Referral Summary (Educational)");
+  lines.push("=====================================");
+  if (fileNum) lines.push(`Patient file number: ${fileNum}`);
+  lines.push(`Created at: ${createdAt}`);
+  lines.push(`Pathway: ${data.pathway || payload?.pathway || "unknown"}`);
+  lines.push(`Triage: ${data.triage || "unknown"} (score: ${data.priority_score ?? "N/A"}/100)`);
+  lines.push("");
+
+  lines.push("Clinical context");
+  lines.push(`- Chief concern: ${payload?.chief_concern || "N/A"}`);
+  if (payload?.patient_age) lines.push(`- Age: ${payload.patient_age}`);
+  if (payload?.patient_sex) lines.push(`- Sex: ${payload.patient_sex}`);
+  if (payload?.gestational_weeks) lines.push(`- Gestational age: ${payload.gestational_weeks} weeks`);
+  if (payload?.family_history_summary) lines.push(`- Family history: ${payload.family_history_summary}`);
+  if (payload?.clinical_notes) lines.push(`- Clinical notes: ${payload.clinical_notes}`);
+  lines.push("");
+
+  lines.push("Key reasons");
+  (data.reasons || []).forEach((r) => lines.push(`- ${r}`));
+  if (!data.reasons || data.reasons.length === 0) lines.push("- None");
+  lines.push("");
+
+  lines.push("Suggested red flags (auto-detected)");
+  (data.suggested_flags || []).forEach((f) => lines.push(`- ${f}`));
+  if (!data.suggested_flags || data.suggested_flags.length === 0) lines.push("- None");
+  lines.push("");
+
+  lines.push("Flags used for scoring");
+  (data.used_flags || []).forEach((f) => lines.push(`- ${f}`));
+  if (!data.used_flags || data.used_flags.length === 0) lines.push("- None");
+  lines.push("");
+
+  lines.push("Missing information to collect");
+  (data.missing_info || []).forEach((m) => lines.push(`- ${m}`));
+  if (!data.missing_info || data.missing_info.length === 0) lines.push("- None");
+  lines.push("");
+
+  lines.push("Suggested next steps");
+  (data.next_steps || []).forEach((s) => lines.push(`- ${s}`));
+  if (!data.next_steps || data.next_steps.length === 0) lines.push("- None");
+  lines.push("");
+
+  if ((data.pathway || payload?.pathway) === "prenatal") {
+    lines.push("Prenatal note (time-sensitive)");
+    lines.push("- Please review promptly and prepare ultrasound + screening results before counseling.");
+    lines.push("");
+  }
+
+  lines.push("Disclaimer");
+  lines.push(data.disclaimer || "Educational triage tool only. Not medical advice.");
+
+  return lines.join("\n");
+}
+
+// -------------------------
+// PDF export (jsPDF)
+// -------------------------
+function downloadSummaryAsPDF(text) {
+  if (!text.trim()) return;
+
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    showError("jsPDF not found. Make sure you added the jsPDF script in index.html.");
+    return;
+  }
+
+  const { jsPDF } = window.jspdf;
+
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+
+  const fileNum = lastPayload?.patient_file_number || "";
+  const label = fileNum ? `file_${fileNum}` : (lastResponse?.case_id || "unknown_case");
+
+  const margin = 40;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const maxWidth = pageWidth - margin * 2;
+
+  doc.setFont("Times", "Normal");
+  doc.setFontSize(11);
+
+  const lines = doc.splitTextToSize(text, maxWidth);
+
+  let y = margin;
+
+  // Title once per page
+  function drawHeader() {
+    doc.setFontSize(14);
+    doc.text(`Genetic Referral Summary — ${label}`, margin, 30);
+    doc.setFontSize(11);
+    y = 55;
+  }
+
+  drawHeader();
+
+  const lineHeight = 14;
+
+  lines.forEach((line) => {
+    if (y > pageHeight - margin) {
+      doc.addPage();
+      drawHeader();
+    }
+    doc.text(line, margin, y);
+    y += lineHeight;
+  });
+
+  doc.save(`referral_summary_${label}.pdf`);
+}
+
+// -------------------------
+// Actions
+// -------------------------
+document.getElementById("submitBtn")?.addEventListener("click", async () => {
+  showError("");
+  hideSummary();
+
+  const payload = buildPayloadFromForm();
+  const err = validatePayload(payload);
+  if (err) {
+    showError(err);
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/cases`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const apiErr = await res.json().catch(() => ({}));
+      showError(apiErr.error || "API error");
+      return;
+    }
+
+    const data = await res.json();
+    lastPayload = payload;
+    lastResponse = data;
+
+    renderResult(data);
+  } catch {
+    showError("Cannot reach the API. Make sure the backend is running on port 3001.");
+  }
+});
+
+// Demo: Oncogenetics
+document.getElementById("demoOnco")?.addEventListener("click", () => {
+  document.getElementById("pathway").value = "oncogenetics";
+  toggleSections();
+  toggleGestationalWeeks();
+  hideSummary();
+
+  document.getElementById("patient_file_number")?.value && (document.getElementById("patient_file_number").value = "ONC-001");
+  document.getElementById("patient_age").value = 42;
+  document.getElementById("patient_sex").value = "female";
+
+  document.getElementById("chief_concern").value = "Family history of cancer";
+  document.getElementById("family_history_summary").value =
+    "Mother breast cancer at 45, maternal aunt ovarian cancer at 52";
+  document.getElementById("clinical_notes").value = "Patient requests risk assessment and referral guidance.";
+
+  document.getElementById("family_history_red_flags").value = "";
+
+  document.getElementById("pregnancy_status").value = "not_applicable";
+  document.getElementById("gestational_weeks").value = "";
+  document.getElementById("prenatal_findings").value = "";
+
+  document.getElementById("pediatric_red_flags").value = "";
+  document.getElementById("hpo_terms").value = "";
+
+  showError("");
+});
+
+// Demo: Prenatal
+document.getElementById("demoPrenatal")?.addEventListener("click", () => {
+  document.getElementById("pathway").value = "prenatal";
+  toggleSections();
+  hideSummary();
+
+  document.getElementById("patient_file_number")?.value && (document.getElementById("patient_file_number").value = "PRE-001");
+  document.getElementById("patient_age").value = 30;
+  document.getElementById("patient_sex").value = "female";
+
+  document.getElementById("chief_concern").value = "Abnormal ultrasound finding";
+  document.getElementById("pregnancy_status").value = "pregnant";
+  toggleGestationalWeeks();
+  document.getElementById("gestational_weeks").value = 22;
+
+  // Free text is OK — backend will normalize
+  document.getElementById("prenatal_findings").value = "abnormal ultrasound, increased NT";
+  document.getElementById("clinical_notes").value =
+    "Ultrasound anomaly reported. Increased nuchal translucency. Previous pregnancy with trisomy 21.";
+
+  document.getElementById("family_history_summary").value = "Previous pregnancy affected by Down syndrome (T21).";
+  document.getElementById("family_history_red_flags").value = "";
+
+  document.getElementById("pediatric_red_flags").value = "";
+  document.getElementById("hpo_terms").value = "";
+
+  showError("");
+});
+
+// Demo: Pediatric
+document.getElementById("demoPediatric")?.addEventListener("click", () => {
+  document.getElementById("pathway").value = "pediatric";
+  toggleSections();
+  toggleGestationalWeeks();
+  hideSummary();
+
+  document.getElementById("patient_file_number")?.value && (document.getElementById("patient_file_number").value = "PED-001");
+  document.getElementById("patient_age").value = 4;
+  document.getElementById("patient_sex").value = "male";
+
+  document.getElementById("chief_concern").value = "Developmental delay and seizures";
+  document.getElementById("clinical_notes").value =
+    "Global developmental delay with seizures since age 2.";
+  document.getElementById("pediatric_red_flags").value = "developmental delay, seizures";
+  document.getElementById("hpo_terms").value = "HP:0001263, HP:0001250";
+
+  document.getElementById("family_history_summary").value = "No similar cases reported.";
+  document.getElementById("family_history_red_flags").value = "";
+  document.getElementById("prenatal_findings").value = "";
+  document.getElementById("pregnancy_status").value = "not_applicable";
+  document.getElementById("gestational_weeks").value = "";
+
+  showError("");
+});
+
+// Reset
+document.getElementById("resetForm")?.addEventListener("click", () => {
+  showError("");
+  hideSummary();
+
+  // Reset all fields (inputs/textarea/select)
+  document.querySelectorAll("input, textarea, select").forEach((el) => {
+    if (el.tagName === "SELECT") el.selectedIndex = 0;
+    else el.value = "";
+  });
+
+  // Force placeholders (because placeholder options are disabled)
+  document.getElementById("pathway").value = "";
+  document.getElementById("pregnancy_status").value = "";
+
+  // Hide sections + weeks
+  toggleSections();
+  toggleGestationalWeeks();
+
+  // Uncheck prenatal quick flags
+  document.querySelectorAll('input.pf[type="checkbox"]').forEach(cb => (cb.checked = false));
+
+  // Clear result UI
+  document.getElementById("result")?.classList.add("hidden");
+  document.getElementById("result_empty")?.classList.remove("hidden");
+  document.getElementById("summary_actions")?.classList.add("hidden");
+
+  lastPayload = null;
+  lastResponse = null;
+});
+
+// Generate referral summary
+document.getElementById("generateSummaryBtn")?.addEventListener("click", () => {
+  showError("");
+
+  if (!lastResponse) {
+    showError("Please submit a case first to generate a summary.");
+    return;
+  }
+
+  const summary = buildReferralSummary(lastPayload, lastResponse);
+  showSummary(summary);
+});
+
+// Copy summary
+document.getElementById("copySummary")?.addEventListener("click", async () => {
+  const text = document.getElementById("summaryText")?.textContent || "";
+  if (!text.trim()) return;
+
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    showError("Copy failed. Your browser may block clipboard access.");
+  }
+});
+
+// Download summary as PDF
+document.getElementById("downloadSummary")?.addEventListener("click", () => {
+  const text = document.getElementById("summaryText")?.textContent || "";
+  if (!text.trim()) return;
+  downloadSummaryAsPDF(text);
+});

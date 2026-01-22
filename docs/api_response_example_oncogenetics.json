@@ -1,0 +1,29 @@
+{
+  "case_id": "onc_001",
+  "created_at": "2026-01-19T09:00:00Z",
+
+  "pathway": "oncogenetics",
+
+  "triage": "recommended",
+  "priority_score": 82,
+
+  "reasons": [
+    "Breast cancer diagnosed before age 50 in a first-degree relative",
+    "More than one close relative affected by cancer",
+    "Cancer pattern is compatible with a hereditary cancer syndrome"
+  ],
+
+  "missing_info": [
+    "Exact ages at diagnosis for all affected relatives",
+    "Any previous genetic testing in the family",
+    "Pathology reports if available"
+  ],
+
+  "next_steps": [
+    "Complete a three-generation family history",
+    "Collect available pathology reports",
+    "Refer the patient to genetic counseling"
+  ],
+
+  "disclaimer": "This tool is for educational triage purposes only and does not replace medical decision-making."
+}

@@ -1,0 +1,25 @@
+{
+  "pathway": "pediatric",
+  "patient_age": 4,
+  "patient_sex": "male",
+  "chief_concern": "Developmental delay and seizures",
+  "clinical_notes": "Global developmental delay with seizures since age 2.",
+
+  "personal_history_flags": ["developmental_delay", "seizures"],
+  "personal_history_details": "Seizures treated with valproate.",
+
+  "family_history_summary": "No similar cases reported.",
+  "family_history_red_flags": [],
+  "known_family_variant": {
+    "status": "unknown",
+    "details": ""
+  },
+
+  "pregnancy_status": "not_applicable",
+  "prenatal_findings": [],
+
+  "pediatric_red_flags": ["global_delay", "seizures"],
+  "hpo_terms": ["HP:0001250", "HP:0001251"],
+
+  "data_completeness_level": "medium"
+}

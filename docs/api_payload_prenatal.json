@@ -1,0 +1,25 @@
+{
+  "pathway": "prenatal",
+  "patient_age": 31,
+  "patient_sex": "female",
+  "chief_concern": "Abnormal prenatal ultrasound finding",
+  "clinical_notes": "Increased nuchal translucency detected at first trimester scan.",
+
+  "personal_history_flags": [],
+  "personal_history_details": "",
+
+  "family_history_summary": "",
+  "family_history_red_flags": [],
+  "known_family_variant": {
+    "status": "no",
+    "details": ""
+  },
+
+  "pregnancy_status": "pregnant",
+  "prenatal_findings": ["abnormal_ultrasound"],
+
+  "pediatric_red_flags": [],
+  "hpo_terms": [],
+
+  "data_completeness_level": "high"
+}

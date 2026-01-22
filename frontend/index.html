@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Genetic Referral Assistant (MVP)</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 900px; margin: 24px auto; padding: 0 16px; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+    label { display: block; margin: 10px 0 6px; font-weight: 600; }
+    input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; }
+    textarea { min-height: 90px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    button { padding: 10px 14px; border: none; border-radius: 6px; cursor: pointer; }
+    button.primary { background: #111; color: #fff; }
+    .pill { display: inline-block; padding: 4px 10px; border-radius: 999px; border: 1px solid #ccc; margin-right: 8px; }
+    .muted { color: #555; }
+    ul { margin: 8px 0 0 18px; }
+    .hidden { display: none; }
+    .error { color: #b00020; }
+    .triage-recommended {
+  background: #e6f4ea;
+  border-color: 2px solid #34a853;
+}
+    .triage-discuss {
+  background: #fff4e5;
+  border: 2px solid #f9ab00;
+}
+
+    .triage-not_prioritized {
+  background: #f1f3f4;
+  border: 2px solid #9aa0a6;
+}
+    .time-sensitive {
+  background: #fdecea;
+  border: 2px solid #d93025;
+  color: #d93025;
+  font-weight: bold;
+}
+
+  </style>
+</head>
+<body>
+
+  <h1>Genetic Referral Assistant (MVP)</h1>
+  <p class="muted">Educational triage tool — not a clinical decision.</p>
+
+  <div class="card">
+    <h2>Clinical Form</h2>
+    <label for="patient_file_number">Patient file number</label>
+    <input id="patient_file_number" placeholder="e.g., 2026-001234" />
+    
+    <label for="pathway">Pathway *</label>
+    <select id="pathway" required>
+      <option value="" selected disabled>Choose a pathway</option>
+      <option value="oncogenetics">Oncogenetics</option>
+      <option value="prenatal">Prenatal / Preconception</option>
+      <option value="pediatric">Pediatric</option>
+    </select>
+
+    <div class="row">
+      <div>
+        <label for="patient_age">Patient age *</label>
+        <input id="patient_age" type="number" min="0" required placeholder="e.g., 42" />
+      </div>
+      <div>
+        <label for="patient_sex">Patient sex *</label>
+        <select id="patient_sex" required>
+          <option value="">Select</option>
+          <option value="unknown">Unknown</option>
+          <option value="female">Female</option>
+          <option value="male">Male</option>
+        </select>
+      </div>
+    </div>
+
+    <label for="chief_concern">Chief concern *</label>
+    <input id="chief_concern" placeholder="e.g., Family history of cancer" />
+
+    <label for="clinical_notes">Clinical notes</label>
+    <textarea id="clinical_notes" placeholder="Short summary (symptoms, context, history)"></textarea>
+
+    <label for="family_history_summary">Family history summary</label>
+    <textarea id="family_history_summary" placeholder="Who, what, and age at diagnosis (if known)"></textarea>
+
+    <label for="family_history_red_flags">Family history red flags (comma-separated)</label>
+    <input id="family_history_red_flags" placeholder="e.g., early_onset, multiple_cases" />
+
+    <div id="prenatal_section" class="hidden">
+      <h3>Prenatal fields</h3>
+      <label for="pregnancy_status">Pregnancy status</label>
+      <select id="pregnancy_status">
+        <option value="" selected disabled>Choose a status</option>
+        <option value="pregnant">Pregnant</option>
+        <option value="preconception">Preconception</option>
+        <option value="not_applicable">Not applicable</option>
+      </select>
+      <label for="gestational_weeks" class="hidden">Gestational age (weeks)</label>
+      <input
+        id="gestational_weeks"
+        type="number"
+        min="0"
+        max="45"
+        placeholder="e.g., 22"
+        class="hidden"
+      />
+      <h4>Quick flags (recommended)</h4>
+      <label><input type="checkbox" class="pf" value="abnormal_ultrasound"> Abnormal ultrasound</label>
+      <label><input type="checkbox" class="pf" value="increased_nt"> Increased nuchal translucency (NT)</label>
+      <label><input type="checkbox" class="pf" value="previous_aneuploidy"> Previous aneuploidy (e.g., T21)</label>
+      <label><input type="checkbox" class="pf" value="positive_screening"> Positive screening / high risk</label>
+
+      <label for="prenatal_findings_free">Other prenatal findings (free text)</label>
+      <input id="prenatal_findings_free" placeholder="e.g., cardiac malformation, soft markers, IUGR..." />
+
+      <label for="prenatal_findings">Prenatal findings (comma-separated)</label>
+      <input id="prenatal_findings" placeholder="e.g., abnormal_ultrasound, previous_affected_child" />
+    </div>
+
+    <div id="pediatric_section" class="hidden">
+      <h3>Pediatric fields</h3>
+      <label for="pediatric_red_flags">Pediatric red flags (comma-separated)</label>
+      <input id="pediatric_red_flags" placeholder="e.g., global_delay, seizures" />
+      <label for="hpo_terms">HPO terms (comma-separated)</label>
+      <input id="hpo_terms" placeholder="e.g., HP:0001250, HP:0001251" />
+    </div>
+
+    <p id="form_error" class="error hidden"></p>
+    <p class="muted">
+  Demo cases (for demonstration purposes):
+    </p>
+
+    <div style="margin: 12px 0; display: flex; gap: 8px; flex-wrap: wrap;">
+      <button type="button" id="demoOnco">Load oncogenetic demo</button>
+      <button type="button" id="demoPrenatal">Load prenatal demo</button>
+      <button type="button" id="demoPediatric">Load pediatric demo</button>
+      <button type="button" id="resetForm">Reset form</button>
+    </div>
+    <button class="primary" id="submitBtn">Submit</button>
+  </div>
+
+  <div class="card">
+    <h2>Assessment Result</h2>
+    <div id="result_empty" class="muted">Submit a case to see the assessment.</div>
+    <div id="result" class="hidden"></div>
+
+    <div id="summary_actions" class="hidden" style="margin-top:12px;">
+      <button type="button" id="generateSummaryBtn">Generate referral summary</button>
+      <button type="button" id="recalcBtn">Recalculate with confirmed flags</button>
+    </div>
+
+    <div id="summary_card" class="card hidden">
+      <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+         <h3 style="margin:0;">Referral Summary</h3>
+         <div style="display:flex; gap:8px; flex-wrap:wrap;">
+           <button type="button" id="copySummary">Copy</button>
+           <button type="button" id="downloadSummary">Download PDF</button>
+        </div>
+      </div>
+
+      <pre id="summaryText" style="white-space:pre-wrap; margin-top:10px;"></pre>
+    </div>
+
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
+

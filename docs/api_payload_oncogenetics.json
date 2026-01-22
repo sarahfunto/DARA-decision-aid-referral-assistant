@@ -1,0 +1,25 @@
+{
+  "pathway": "oncogenetics",
+  "patient_age": 42,
+  "patient_sex": "female",
+  "chief_concern": "Family history of breast and ovarian cancer",
+  "clinical_notes": "Mother had breast cancer at 45. Maternal aunt had ovarian cancer at 52.",
+
+  "personal_history_flags": [],
+  "personal_history_details": "",
+
+  "family_history_summary": "Mother: breast cancer at 45. Aunt: ovarian cancer at 52.",
+  "family_history_red_flags": ["early_onset", "multiple_cases"],
+  "known_family_variant": {
+    "status": "unknown",
+    "details": ""
+  },
+
+  "pregnancy_status": "not_applicable",
+  "prenatal_findings": [],
+
+  "pediatric_red_flags": [],
+  "hpo_terms": [],
+
+  "data_completeness_level": "medium"
+}

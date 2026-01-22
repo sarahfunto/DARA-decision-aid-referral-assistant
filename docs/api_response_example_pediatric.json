@@ -1,0 +1,29 @@
+{
+  "case_id": "ped_001",
+  "created_at": "2026-01-19T09:20:00Z",
+
+  "pathway": "pediatric",
+
+  "triage": "recommended",
+  "priority_score": 78,
+
+  "reasons": [
+    "Global developmental delay reported",
+    "Seizures starting in early childhood",
+    "Combination of neurological symptoms suggests a possible genetic condition"
+  ],
+
+  "missing_info": [
+    "Growth parameters and head circumference",
+    "Results of neurological and metabolic evaluations",
+    "Detailed phenotype description using HPO terms"
+  ],
+
+  "next_steps": [
+    "Complete clinical examination and phenotype documentation",
+    "Confirm and expand HPO terms",
+    "Refer to pediatric genetic counseling"
+  ],
+
+  "disclaimer": "This tool is for educational triage purposes only and does not replace medical decision-making."
+}
