@@ -59,6 +59,24 @@
   margin: 0;
   padding: 0;
 }
+    .flagRow{
+      display: grid;
+      grid-template-columns: 20px 1fr;
+      align-items: center;
+      gap: 10px;
+      margin: 8px 0;
+}
+
+    .flagRow input{
+      margin: 0;
+      justify-self: start;
+}
+
+    .flagLabel{
+      text-align: left;
+      word-break: break-word;
+}
+
   </style>
 </head>
 <body>
@@ -108,11 +126,10 @@
     <label for="family_history_summary">Family history summary</label>
     <textarea id="family_history_summary" placeholder="Who, what, and age at diagnosis (if known)"></textarea>
 
-    <label for="family_history_red_flags">Family history red flags (comma-separated)</label>
-    <input id="family_history_red_flags" placeholder="e.g., early_onset, multiple_cases" />
 
     <div id="prenatal_section" class="hidden">
-      <h3>Prenatal fields</h3>
+      <h3>Prenatal / Preconception fields</h3>
+
       <label for="pregnancy_status">Pregnancy status</label>
       <select id="pregnancy_status">
         <option value="" selected disabled>Choose a status</option>
@@ -120,6 +137,7 @@
         <option value="preconception">Preconception</option>
         <option value="not_applicable">Not applicable</option>
       </select>
+
       <label for="gestational_weeks" class="hidden">Gestational age (weeks)</label>
       <input
         id="gestational_weeks"
@@ -127,20 +145,26 @@
         min="0"
         max="45"
         placeholder="e.g., 22"
-        class="hidden"
-      />
-      <h4>Quick flags (recommended)</h4>
-      <label><input type="checkbox" class="pf" value="abnormal_ultrasound"> Abnormal ultrasound</label>
-      <label><input type="checkbox" class="pf" value="increased_nt"> Increased nuchal translucency (NT)</label>
-      <label><input type="checkbox" class="pf" value="previous_aneuploidy"> Previous aneuploidy (e.g., T21)</label>
-      <label><input type="checkbox" class="pf" value="positive_screening"> Positive screening / high risk</label>
+       class="hidden"
+    />
 
-      <label for="prenatal_findings_free">Other prenatal findings (free text)</label>
-      <input id="prenatal_findings_free" placeholder="e.g., cardiac malformation, soft markers, IUGR..." />
+    <p class="muted" style="margin-top:10px;">
+      Note: In the 2-step workflow, DARA will propose suggested red flags after submission.
+      The physician confirms them in the results before a score is computed.
+    </p>
 
-      <label for="prenatal_findings">Prenatal findings (comma-separated)</label>
-      <input id="prenatal_findings" placeholder="e.g., abnormal_ultrasound, previous_affected_child" />
-    </div>
+    <label for="prenatal_findings_free">Prenatal findings (free text)</label>
+    <input
+      id="prenatal_findings_free"
+      placeholder="e.g., cardiac malformation, soft markers, IUGR, increased NT..."
+    />
+
+    <label for="prenatal_findings">Prenatal findings (comma-separated)</label>
+    <input
+      id="prenatal_findings"
+      placeholder="e.g., abnormal_ultrasound, increased_nt, positive_screening"
+    />
+  </div>
 
     <div id="pediatric_section" class="hidden">
       <h3>Pediatric fields</h3>
@@ -171,7 +195,6 @@
 
     <div id="summary_actions" class="hidden" style="margin-top:12px;">
       <button type="button" id="generateSummaryBtn">Generate referral summary</button>
-      <button type="button" id="recalcBtn">Recalculate with confirmed flags</button>
     </div>
 
     <div id="summary_card" class="card hidden">

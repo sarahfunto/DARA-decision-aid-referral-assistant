@@ -87,20 +87,18 @@ function buildPayloadFromForm() {
     patient_file_number: document.getElementById("patient_file_number")?.value.trim() || "",
 
     patient_age: Number(document.getElementById("patient_age")?.value) || null,
-    patient_sex: document.getElementById("patient_sex")?.value || "unknown",
+    patient_sex: document.getElementById("patient_sex")?.value || "",
 
     chief_concern: document.getElementById("chief_concern")?.value.trim() || "",
     clinical_notes: document.getElementById("clinical_notes")?.value.trim() || "",
     family_history_summary: document.getElementById("family_history_summary")?.value.trim() || "",
 
-    // These might remain in your HTML — ok to keep
-    family_history_red_flags: csvToList(document.getElementById("family_history_red_flags")?.value || ""),
-
-    pregnancy_status: document.getElementById("pregnancy_status")?.value || "not_applicable",
+    pregnancy_status: document.getElementById("pregnancy_status")?.value || "",
     gestational_weeks: Number(document.getElementById("gestational_weeks")?.value) || null,
 
     // If your input is free text, we still pass it as a list by splitting commas
     prenatal_findings: csvToList(document.getElementById("prenatal_findings")?.value || ""),
+    prenatal_findings_free: document.getElementById("prenatal_findings_free")?.value.trim() || "",
     pediatric_red_flags: csvToList(document.getElementById("pediatric_red_flags")?.value || ""),
     hpo_terms: csvToList(document.getElementById("hpo_terms")?.value || ""),
   };
@@ -127,33 +125,32 @@ function validatePayload(payload) {
 // Rendering
 // -------------------------
 function renderSuggestedFlags(data) {
-  const flags = data.suggested_flags || [];
-  if (!flags.length) {
-    return `<p class="muted">No suggested flags detected.</p>`;
+  if (!data.suggested_flags || data.suggested_flags.length === 0) {
+    return "";
   }
 
-  // All checked by default (doctor can uncheck)
-  const boxes = flags
+  const flags = (data.suggested_flags || [])
     .map(
       (f) => `
-      <label style="display:block; margin:6px 0;">
+      <label class="flagRow">
         <input type="checkbox" class="flagBox" value="${f}" checked />
-        ${f}
+        <span class="flagLabel">${f}</span>
       </label>
     `
-    )
-    .join("");
+  )
+  .join("");
 
   return `
-    <div class="card" style="margin-top:12px;">
-      <h3 style="margin-top:0;">Suggested red flags (auto-detected)</h3>
-      <p class="muted" style="margin-top:4px;">
-        Please confirm the flags. Uncheck any irrelevant ones, then click <b>Recalculate</b>.
+    <div class="card">
+      <h4>Suggested red flags</h4>
+      <p class="muted">
+        Please confirm the relevant flags before computing the score and triage.
       </p>
-      <div id="flagsBox">${boxes}</div>
-      <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
-        <button type="button" id="recalcBtn">Recalculate (confirmed flags)</button>
-      </div>
+      ${flags}
+
+      <button type="button" id="recalcBtn" class="primary">
+        Confirm flags & compute score
+      </button>
     </div>
   `;
 }
@@ -161,11 +158,64 @@ function renderSuggestedFlags(data) {
 function renderResult(data) {
   const empty = document.getElementById("result_empty");
   const result = document.getElementById("result");
+  const isProposeOnly = data.priority_score === null;
+
   if (!result) return;
 
   empty?.classList.add("hidden");
   result.classList.remove("hidden");
+  // STEP 1 ONLY: pending confirmation UI
+  if (data.triage === "pending_confirmation") {
+    result.className = "card";
+    result.innerHTML = `
+      <h3>Step 1 – Confirm detected red flags</h3>
+      <p class="muted">
+        The assistant detected potential genetic red flags from the provided information.
+        Please confirm the relevant flags before a score and referral recommendation can be generated.
+      </p>
+      ${renderSuggestedFlags(data)}
+      <p class="muted"><small>${data.disclaimer || ""}</small></p>
+    `;
 
+    document.getElementById("summary_actions")?.classList.add("hidden");
+
+  // Attach click handler for the injected button
+  const recalcBtn = document.getElementById("recalcBtn");
+  recalcBtn?.addEventListener("click", async () => {
+    showError("");
+
+    if (!lastPayload) {
+      showError("No previous case found. Please submit a case first.");
+      return;
+    }
+
+    const confirmed = Array.from(document.querySelectorAll(".flagBox:checked")).map(cb => cb.value);
+    const payload2 = { ...lastPayload, confirmed_flags: confirmed };
+
+    try {
+      const res = await fetch(`${API_BASE}/cases`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload2),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        showError(err.error || "API error");
+        return;
+      }
+      const data2 = await res.json();
+      lastPayload = payload2;
+      lastResponse = data2;
+      renderResult(data2);
+    } catch {
+      showError("Cannot reach the API. Make sure the backend is running on port 3001.");
+    }
+  });
+
+  return; 
+}
+  // STEP 2: full result UI
   const reasons = (data.reasons || []).map((r) => `<li>${r}</li>`).join("");
   const missing = (data.missing_info || []).map((m) => `<li>${m}</li>`).join("");
   const steps = (data.next_steps || []).map((s) => `<li>${s}</li>`).join("");
@@ -177,8 +227,8 @@ function renderResult(data) {
     <div style="display:flex; flex-wrap:wrap; gap:8px;">
       ${fileNum ? `<span class="pill"><b>File #:</b> ${fileNum}</span>` : ""}
       <span class="pill"><b>Pathway:</b> ${data.pathway}</span>
-      <span class="pill"><b>Triage:</b> ${data.triage}</span>
-      <span class="pill"><b>Score:</b> ${data.priority_score}/100</span>
+      ${!isProposeOnly ? `<span class="pill"><b>Triage:</b> ${data.triage}</span>` : ""}
+      ${!isProposeOnly ? `<span class="pill"><b>Score:</b> ${data.priority_score}/100</span>` : ""}
       ${
         data.pathway === "prenatal"
           ? `<span class="pill time-sensitive">⏱️ Time-sensitive</span>`
@@ -218,51 +268,16 @@ function renderResult(data) {
         : ""
     }
 
-    ${renderSuggestedFlags(data)}
-
     <p class="muted"><small>${data.disclaimer || ""}</small></p>
   `;
 
   // If you have a "summary_actions" container that you want to show after a result:
+  if (!isProposeOnly) {
   document.getElementById("summary_actions")?.classList.remove("hidden");
+} else {
+  document.getElementById("summary_actions")?.classList.add("hidden");
+}
 
-  // Wire up recalc button (exists only after renderSuggestedFlags)
-  const recalcBtn = document.getElementById("recalcBtn");
-  recalcBtn?.addEventListener("click", async () => {
-    showError("");
-
-    if (!lastPayload) {
-      showError("No previous case found. Please submit a case first.");
-      return;
-    }
-
-    const confirmed = Array.from(document.querySelectorAll(".flagBox:checked")).map(
-      (cb) => cb.value
-    );
-
-    const payload2 = { ...lastPayload, confirmed_flags: confirmed };
-
-    try {
-      const res = await fetch(`${API_BASE}/cases`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload2),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        showError(err.error || "API error");
-        return;
-      }
-
-      const data2 = await res.json();
-      lastPayload = payload2;
-      lastResponse = data2;
-      renderResult(data2);
-    } catch {
-      showError("Cannot reach the API. Make sure the backend is running on port 3001.");
-    }
-  });
 }
 
 // -------------------------
@@ -522,9 +537,6 @@ document.getElementById("resetForm")?.addEventListener("click", () => {
   // Hide sections + weeks
   toggleSections();
   toggleGestationalWeeks();
-
-  // Uncheck prenatal quick flags
-  document.querySelectorAll('input.pf[type="checkbox"]').forEach(cb => (cb.checked = false));
 
   // Clear result UI
   document.getElementById("result")?.classList.add("hidden");
