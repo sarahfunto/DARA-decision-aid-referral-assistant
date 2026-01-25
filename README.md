@@ -239,6 +239,84 @@ are available in the `assets/` folder for all three pathways.
 - Database for case persistence  
 - Multi-language user interface  
 
+---
+
+## Future Extensions in a Real Clinical Context
+
+The current version of DARA intentionally focuses on structured clinical data and free-text analysis using an explainable rule-based approach.
+
+Several extensions are technically feasible and clinically relevant, but were deliberately not implemented at this stage to ensure transparency, safety, and physician control.
+
+### 1. Analysis of Medical Documents (PDF)
+
+In a real clinical setting, genetic referral decisions often rely on multiple documents, such as:
+- Laboratory reports (blood tests, screening results)
+- Pathology reports
+- Imaging reports (ultrasound, MRI, CT scan summaries)
+- Prenatal screening or NIPT reports
+
+A future extension could allow physicians to upload PDF medical documents, which would then be:
+- Parsed and converted to text
+- Analyzed to extract relevant clinical signals
+- Used as additional contextual input during Step 1 (suggested red flags)
+
+This functionality was intentionally excluded from the current version due to:
+- Variability and quality issues in medical PDFs
+- OCR and parsing uncertainties
+- The need for strict human validation before clinical use
+
+---
+
+### 2. Advanced Free-Text Analysis and NLP Improvements
+
+The current implementation relies on structured rules applied to both structured fields and free-text clinical notes.
+
+Future versions could integrate:
+- Semantic embeddings to capture nuanced clinical language
+- Similarity-based detection of genetic patterns
+- Machine learning models trained on validated clinical datasets
+
+These approaches were not implemented in the current version to preserve:
+- Full explainability
+- Deterministic behavior
+- Ease of clinical review and validation
+
+---
+
+### 3. Medical Image Analysis (Out of Scope for This Project)
+
+Advanced analysis of medical images (e.g., ultrasound images, MRI, radiology scans) could theoretically enrich genetic referral assessment.
+
+However, image-based analysis:
+- Requires large, validated medical datasets
+- Introduces significant regulatory and ethical considerations
+- Goes beyond the scope of an educational decision-support tool
+
+For these reasons, image analysis was intentionally excluded and would only be considered in a strictly regulated clinical research context.
+
+---
+
+### 4. Assisted HPO Term Suggestion for Pediatric Genetics
+
+In pediatric genetics, accurate phenotypic description using Human Phenotype Ontology (HPO) terms is essential but often challenging for non-specialist clinicians.
+
+A future extension of DARA could include:
+- Automatic suggestion of relevant HPO terms based on free-text clinical descriptions
+- Presentation of HPO terms as selectable (checkbox-based) suggestions, similar to red flags confirmation
+- Physician validation of proposed HPO terms before inclusion in the assessment
+
+This approach would:
+- Reduce cognitive burden for clinicians unfamiliar with HPO
+- Improve phenotype standardization
+- Facilitate downstream genetic consultation and variant interpretation
+
+HPO term suggestion was intentionally excluded from the current version to avoid overcomplexity and to keep a clear separation between triage reasoning and detailed phenotypic encoding.
+
+---
+Overall, these future extensions highlight the potential evolution of DARA while maintaining its core principles:
+- Clinical safety
+- Explainability
+- Physician-in-the-loop decision-making
 
 ---
 
@@ -246,6 +324,8 @@ are available in the `assets/` folder for all three pathways.
 
 DARA is an educational decision-support tool.  
 It does not provide medical advice and must not be used as a standalone clinical decision system.
+
+---
 
 ## Author
 
