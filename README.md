@@ -265,7 +265,6 @@ This functionality was intentionally excluded from the current version due to:
 - OCR and parsing uncertainties
 - The need for strict human validation before clinical use
 
----
 
 ### 2. Advanced Free-Text Analysis and NLP Improvements
 
@@ -281,7 +280,6 @@ These approaches were not implemented in the current version to preserve:
 - Deterministic behavior
 - Ease of clinical review and validation
 
----
 
 ### 3. Medical Image Analysis (Out of Scope for This Project)
 
@@ -294,7 +292,6 @@ However, image-based analysis:
 
 For these reasons, image analysis was intentionally excluded and would only be considered in a strictly regulated clinical research context.
 
----
 
 ### 4. Assisted HPO Term Suggestion for Pediatric Genetics
 
