@@ -1,17 +1,39 @@
-// app.js — Option A (complete): auto-detect flags + physician confirms via checkboxes
+// app.js  auto-detect flags + physician confirms via checkboxes
 const API_BASE = "http://localhost:3001";
 
 const pathwayEl = document.getElementById("pathway");
 const prenatalSection = document.getElementById("prenatal_section");
 const pediatricSection = document.getElementById("pediatric_section");
 
-// (Optional) these might not exist in your HTML — we use ?. to be safe
+// these might not exist in your HTML — we use ?. to be safe
 const pregnancyStatusEl = document.getElementById("pregnancy_status");
 const gestWeeksLabel = document.querySelector('label[for="gestational_weeks"]');
 const gestWeeksInput = document.getElementById("gestational_weeks");
 
 let lastPayload = null;
 let lastResponse = null;
+
+function show(el) { if (el) el.style.display = ""; }
+function hide(el) { if (el) el.style.display = "none"; }
+
+const llmSection = document.getElementById("llmSection");
+const llmExplanationEl = document.getElementById("llmExplanation");
+const copyLlmBtn = document.getElementById("copyLlmBtn");
+
+if (copyLlmBtn) {
+  copyLlmBtn.addEventListener("click", async () => {
+    const text = llmExplanationEl?.textContent || "";
+    if (!text) return;
+
+    try {
+      await navigator.clipboard.writeText(text);
+      copyLlmBtn.textContent = "Copied!";
+      setTimeout(() => (copyLlmBtn.textContent = "Copy explanation"), 1200);
+    } catch {
+      alert("Copy failed. Please select and copy manually.");
+    }
+  });
+}
 
 // -------------------------
 // UI toggles
@@ -208,7 +230,8 @@ function renderResult(data) {
       lastPayload = payload2;
       lastResponse = data2;
       renderResult(data2);
-    } catch {
+    } catch (e) {
+      console.error(e);
       showError("Cannot reach the API. Make sure the backend is running on port 3001.");
     }
   });
@@ -431,7 +454,27 @@ document.getElementById("submitBtn")?.addEventListener("click", async () => {
     lastResponse = data;
 
     renderResult(data);
-  } catch {
+
+  // -------------------------
+  // Display LLM explanation
+  // -------------------------
+    const llmText = (data && data.llm_explanation)
+      ? String(data.llm_explanation).trim()
+      : null;
+
+    if (llmText) {
+      llmExplanationEl.textContent = llmText;
+      show(llmSection);
+    } else {
+      llmExplanationEl.textContent =
+       "GenAI explanation (optional)\n\n" +
+       "The decision above was computed using a deterministic, rule-based engine.\n" +
+       "An optional GenAI layer can generate educational explanations when enabled.";
+      show(llmSection);
+   }
+
+  } catch (e) {
+    console.error(e);
     showError("Cannot reach the API. Make sure the backend is running on port 3001.");
   }
 });
