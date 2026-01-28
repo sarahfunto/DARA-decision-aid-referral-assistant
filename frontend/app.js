@@ -1,6 +1,6 @@
 // app.js  auto-detect flags + physician confirms via checkboxes
 const IS_VERCEL = window.location.hostname.includes("vercel.app");
-const API_BASE = IS_VERCEL ? "" : "http://localhost:3001";
+const API_BASE = "http://localhost:3001";
 
 // -------------------------
 // DEMO helpers (Vercel)
