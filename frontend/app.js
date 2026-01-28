@@ -239,10 +239,25 @@ function renderResult(data) {
       lastResponse = data2;
       renderResult(data2);
     } catch (e) {
-      console.error(e);
-    // DEMO fallback on Vercel
-      runDemoFallback();
+  console.error(e);
+
+  // ✅ DEMO Step 2 on Vercel: compute from confirmed flags
+  if (IS_VERCEL) {
+    const confirmed = Array.from(document.querySelectorAll(".flagBox:checked")).map(cb => cb.value);
+    const step2 = demoStep2(payload2.pathway, confirmed);
+
+    lastResponse = step2;
+    renderResult(step2);
+
+    if (llmExplanationEl) {
+      llmExplanationEl.textContent = step2.llm_explanation || "";
     }
+
+    return;
+  }
+
+  showError("Cannot reach the API. Make sure the backend is running on port 3001.");
+}
   });
 
   return; 
@@ -602,14 +617,19 @@ document.getElementById("submitBtn")?.addEventListener("click", async () => {
     return;
   }
 
-    // DEMO MODE on Vercel: do not call localhost API
+// DEMO MODE on Vercel: do not call localhost API
   if (IS_VERCEL) {
-    const pathway = payload.pathway; // already in payload
-    const decision = demoDecisionForPathway(pathway);
-    renderDemoToExistingUI(decision);
+    lastPayload = payload;
+
+    const step1 = demoStep1(payload.pathway); // Step 1 = suggested flags
+    lastResponse = step1;
+    renderResult(step1);
+
+  // Fill GenAI box
+    if (llmExplanationEl) llmExplanationEl.textContent = step1.llm_explanation || "";
+
     return;
   }
-
   try {
     const res = await fetch(`${API_BASE}/cases`, {
       method: "POST",
@@ -802,216 +822,3 @@ document.getElementById("downloadSummary")?.addEventListener("click", () => {
  * - Works for 3 pathways + GenAI explanation
  ************************/
 
-(function enableDemoMode() {
-  // ---- 1) Find the form (we attach to the first form if we can't find by id)
-  const form =
-    document.querySelector("form") ||
-    document.getElementById("clinicalForm") ||
-    document.getElementById("caseForm");
-
-  if (!form) {
-    console.warn("[DEMO MODE] No form found. Demo mode not attached.");
-    return;
-  }
-
-  // ---- 2) Find / create the Assessment Result container
-  const existingResult =
-    document.getElementById("assessmentResult") ||
-    document.getElementById("result") ||
-    document.querySelector(".assessment-result") ||
-    document.querySelector("#assessment-result");
-
-  const resultBox = existingResult || document.createElement("div");
-  if (!existingResult) {
-    resultBox.id = "assessmentResult";
-    resultBox.style.marginTop = "16px";
-    resultBox.style.padding = "12px";
-    resultBox.style.border = "1px solid #ddd";
-    resultBox.style.borderRadius = "8px";
-    form.insertAdjacentElement("afterend", resultBox);
-  }
-
-  // ---- 3) Hide the "Cannot reach API" message if it exists
-  function hideApiErrorIfAny() {
-    const nodes = Array.from(document.querySelectorAll("div, p, span, small"));
-    nodes.forEach((n) => {
-      const t = (n.textContent || "").toLowerCase();
-      if (t.includes("cannot reach the api") || t.includes("backend is running on port")) {
-        n.style.display = "none";
-      }
-    });
-  }
-
-  // ---- 4) Read pathway from UI (tries several common selectors)
-  function getPathway() {
-    const byId =
-      document.getElementById("pathway") ||
-      document.getElementById("clinical_pathway") ||
-      document.getElementById("pathwaySelect");
-    if (byId && byId.value) return normalizePathway(byId.value);
-
-    const byName = document.querySelector('select[name="pathway"], select[name="clinical_pathway"]');
-    if (byName && byName.value) return normalizePathway(byName.value);
-
-    // fallback: try to detect from text
-    return "oncogenetics";
-  }
-
-  function normalizePathway(v) {
-    const x = String(v || "").toLowerCase();
-    if (x.includes("onco")) return "oncogenetics";
-    if (x.includes("prenatal") || x.includes("preconception")) return "prenatal";
-    if (x.includes("pedi")) return "pediatric";
-    return "oncogenetics";
-  }
-
-  // ---- 5) Demo results for 3 pathways (includes GenAI explanation)
-  function demoDecision(pathway) {
-    const commonDisclaimer =
-      "Educational demo only. This does not replace clinical judgment. Consider local referral guidelines and urgent red flags.";
-
-    if (pathway === "oncogenetics") {
-      return {
-        pathway: "oncogenetics",
-        triage: "REFER (Priority: High)",
-        priority_score: 88,
-        red_flags: [
-          "Early-onset cancer (<50 years)",
-          "Multiple related cancers in the family",
-          "Bilateral / multiple primary tumors",
-        ],
-        reasons: [
-          "Pattern suggests possible hereditary cancer syndrome.",
-          "Referral can guide testing strategy and prevention for the patient and relatives.",
-        ],
-        missing_info: ["Exact cancer types and ages of diagnosis in relatives", "Pathology details (if available)"],
-        genai_explanation:
-          "Based on the information provided, there are several features consistent with increased hereditary cancer risk (early onset and clustering of related cancers). DARA recommends referral to oncogenetics to confirm eligibility for genetic testing, interpret results, and guide surveillance and prevention. " +
-          commonDisclaimer,
-      };
-    }
-
-    if (pathway === "prenatal") {
-      return {
-        pathway: "prenatal",
-        triage: "REFER URGENTLY (Priority: High)",
-        priority_score: 92,
-        red_flags: [
-          "Abnormal ultrasound finding (e.g., increased nuchal translucency)",
-          "History of aneuploidy / trisomy in a prior pregnancy",
-          "Multiple concerning prenatal markers",
-        ],
-        reasons: [
-          "Combination of abnormal ultrasound findings + significant obstetric history increases genetic risk.",
-          "Genetic counseling can clarify testing options (NIPT, CVS/amniocentesis, microarray/exome depending on context).",
-        ],
-        missing_info: ["Exact NT measurement and gestational age at scan", "Screening results (NIPT/biochemistry)", "Any fetal anomalies details"],
-        genai_explanation:
-          "DARA suggests an urgent referral because abnormal prenatal markers plus a prior pregnancy affected by trisomy strongly increases the probability of a genetic or chromosomal condition. A genetics consultation can help select the right test and timing, explain benefits/limits, and support shared decision-making. " +
-          commonDisclaimer,
-      };
-    }
-
-    // pediatric
-    return {
-      pathway: "pediatric",
-      triage: "REFER (Priority: Moderate–High)",
-      priority_score: 80,
-      red_flags: [
-        "Global developmental delay / intellectual disability",
-        "Multiple congenital anomalies or dysmorphic features",
-        "Unexplained seizures, regression, or multisystem involvement",
-      ],
-      reasons: [
-        "The presentation may be compatible with a genetic syndrome.",
-        "Genetic evaluation can improve diagnosis, management, and recurrence-risk counseling for the family.",
-      ],
-      missing_info: ["Growth parameters (HC/weight/height percentiles)", "Key physical exam findings", "Previous tests (MRI/EEG/metabolic)"],
-      genai_explanation:
-        "DARA recommends referral because developmental concerns plus multisystem signs are common indications for genetic evaluation. A genetics consultation can prioritize the right workup (chromosomal microarray, gene panels, exome when appropriate) and translate results into clinical care decisions. " +
-        commonDisclaimer,
-    };
-  }
-
-  // ---- 6) Render in Assessment Result
-  function renderResult(decision) {
-    hideApiErrorIfAny();
-
-    const rf = (decision.red_flags || []).map((x) => `<li>${escapeHtml(x)}</li>`).join("");
-    const rs = (decision.reasons || []).map((x) => `<li>${escapeHtml(x)}</li>`).join("");
-    const mi = (decision.missing_info || []).map((x) => `<li>${escapeHtml(x)}</li>`).join("");
-
-    resultBox.innerHTML = `
-      <h3 style="margin: 0 0 8px 0;">Assessment Result (DEMO)</h3>
-      <div style="margin-bottom:8px;">
-        <div><strong>Pathway:</strong> ${escapeHtml(decision.pathway)}</div>
-        <div><strong>Triage:</strong> ${escapeHtml(decision.triage)}</div>
-        <div><strong>Priority score:</strong> ${escapeHtml(String(decision.priority_score))} / 100</div>
-      </div>
-
-      <div style="margin: 10px 0;">
-        <strong>Red flags</strong>
-        <ul style="margin: 6px 0 0 18px;">${rf || "<li>None</li>"}</ul>
-      </div>
-
-      <div style="margin: 10px 0;">
-        <strong>Reasons</strong>
-        <ul style="margin: 6px 0 0 18px;">${rs || "<li>No reasons provided</li>"}</ul>
-      </div>
-
-      <div style="margin: 10px 0;">
-        <strong>Missing information</strong>
-        <ul style="margin: 6px 0 0 18px;">${mi || "<li>None</li>"}</ul>
-      </div>
-
-      <div style="margin: 10px 0; padding: 10px; background:#fafafa; border:1px solid #eee; border-radius:8px;">
-        <strong>GenAI explanation</strong>
-        <p style="margin: 6px 0 0 0;">${escapeHtml(decision.genai_explanation || "")}</p>
-      </div>
-
-      <small style="display:block; margin-top:8px; color:#666;">
-        Demo mode is enabled because the backend API is not deployed.
-      </small>
-    `;
-  }
-
-  function escapeHtml(s) {
-    return String(s ?? "")
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#039;");
-  }
-
-  // ---- 7) Hook submit: try API if it exists, otherwise demo result
-  form.addEventListener(
-    "submit",
-    async (e) => {
-      // IMPORTANT: we prevent page reload
-      e.preventDefault();
-
-      // If your original code already handles submit, we still force demo render when API fails
-      const pathway = getPathway();
-
-      // Try to detect if your app already defines an API URL and uses fetch.
-      // If API isn't reachable, we fallback to demo.
-      try {
-        // Minimal "ping": you can change this if you have a /health route
-        // If there is no backend deployed, it will fail -> demo mode
-        await fetch("/__non_existing_ping__", { method: "GET" });
-      } catch (_) {
-        const decision = demoDecision(pathway);
-        renderResult(decision);
-        return;
-      }
-
-      // If the above doesn't fail (rare), still show demo so the UI always shows something on Vercel
-      const decision = demoDecision(pathway);
-      renderResult(decision);
-    },
-    true
-  );
-
-  console.log("[DEMO MODE] Enabled. If backend is not deployed, results will still display.");
-})();
