@@ -2,7 +2,101 @@
 const IS_VERCEL = window.location.hostname.includes("vercel.app");
 const API_BASE = IS_VERCEL ? "" : "http://localhost:3001";
 
+// -------------------------
+// DEMO helpers (Vercel)
+// -------------------------
+function demoStep1(pathway) {
+  const base = {
+    pathway,
+    triage: "pending_confirmation",
+    priority_score: null,
+    disclaimer: "Demo mode (Vercel): backend not deployed. Educational only.",
+    llm_explanation:
+      "GenAI explanation (demo): This result is generated locally for presentation purposes because the backend is not deployed on Vercel.",
+  };
 
+  if (pathway === "prenatal") {
+    return {
+      ...base,
+      suggested_flags: [
+        "Increased nuchal translucency (NT)",
+        "Previous pregnancy with trisomy 21",
+        "Multiple concerning prenatal markers",
+      ],
+    };
+  }
+
+  if (pathway === "pediatric") {
+    return {
+      ...base,
+      suggested_flags: [
+        "Global developmental delay / intellectual disability",
+        "Seizures or regression",
+        "Multiple congenital anomalies / dysmorphic features",
+      ],
+    };
+  }
+
+  // oncogenetics default
+  return {
+    ...base,
+    suggested_flags: [
+      "Early-onset cancer (<50 years)",
+      "Multiple related cancers in the family",
+      "Ovarian cancer in family",
+    ],
+  };
+}
+
+function demoStep2(pathway, confirmedFlags) {
+  const base = {
+    pathway,
+    triage: "refer_high",
+    priority_score: Math.min(95, 60 + (confirmedFlags?.length || 0) * 10),
+    reasons: (confirmedFlags || []).map((f) => `Confirmed red flag: ${f}`),
+    missing_info: ["Demo: add more clinical details if available."],
+    next_steps: ["Refer to genetic counseling / genetics clinic."],
+    disclaimer: "Demo mode (Vercel). Educational only — not medical advice.",
+    llm_explanation:
+      "GenAI explanation (demo): Based on the confirmed red flags, DARA recommends referral. This explanation is generated locally for the demo because the backend/LLM is not deployed.",
+    suggested_flags: confirmedFlags || [],
+    used_flags: confirmedFlags || [],
+  };
+
+  if (pathway === "prenatal") {
+    return {
+      ...base,
+      triage: "refer_urgent",
+      next_steps: [
+        "Urgent genetics referral (time-sensitive prenatal case).",
+        "Prepare ultrasound report + screening results (NIPT / serum).",
+        "Discuss diagnostic testing options (CVS / amniocentesis) as appropriate.",
+      ],
+    };
+  }
+
+  if (pathway === "pediatric") {
+    return {
+      ...base,
+      next_steps: [
+        "Genetics referral (consider CMA / gene panel / exome as appropriate).",
+        "Collect growth parameters + detailed physical exam findings.",
+        "Review previous workup (EEG/MRI/metabolic) if done.",
+      ],
+    };
+  }
+
+  // oncogenetics
+  return {
+    ...base,
+    next_steps: [
+      "Oncogenetics referral.",
+      "Collect a 3-generation family history with ages of diagnosis.",
+      "Consider guideline-based genetic testing strategy.",
+    ],
+  };
+}
+// -------------------------
 const pathwayEl = document.getElementById("pathway");
 const prenatalSection = document.getElementById("prenatal_section");
 const pediatricSection = document.getElementById("pediatric_section");
