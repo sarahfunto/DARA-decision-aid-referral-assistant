@@ -209,7 +209,7 @@ function renderResult(data) {
 
     document.getElementById("summary_actions")?.classList.add("hidden");
 
-  // Attach click handler for the injected button
+// Attach click handler for the injected button
   const recalcBtn = document.getElementById("recalcBtn");
   recalcBtn?.addEventListener("click", async () => {
     showError("");
@@ -222,6 +222,17 @@ function renderResult(data) {
     const confirmed = Array.from(document.querySelectorAll(".flagBox:checked")).map(cb => cb.value);
     const payload2 = { ...lastPayload, confirmed_flags: confirmed };
 
+  // ✅ Vercel: demo Step 2 (no backend)
+    if (IS_VERCEL) {
+      const step2 = demoStep2(payload2.pathway, confirmed);
+      lastPayload = payload2;
+      lastResponse = step2;
+      renderResult(step2);
+      if (llmExplanationEl) llmExplanationEl.textContent = step2.llm_explanation || "";
+      return;
+    }
+
+  // ✅ Local: real backend call
     try {
       const res = await fetch(`${API_BASE}/cases`, {
         method: "POST",
@@ -234,33 +245,18 @@ function renderResult(data) {
         showError(err.error || "API error");
         return;
       }
+
       const data2 = await res.json();
       lastPayload = payload2;
       lastResponse = data2;
       renderResult(data2);
     } catch (e) {
-  console.error(e);
-
-  // ✅ DEMO Step 2 on Vercel: compute from confirmed flags
-  if (IS_VERCEL) {
-    const confirmed = Array.from(document.querySelectorAll(".flagBox:checked")).map(cb => cb.value);
-    const step2 = demoStep2(payload2.pathway, confirmed);
-
-    lastResponse = step2;
-    renderResult(step2);
-
-    if (llmExplanationEl) {
-      llmExplanationEl.textContent = step2.llm_explanation || "";
+      console.error(e);
+      showError("Cannot reach the API. Make sure the backend is running on port 3001.");
     }
-
-    return;
-  }
-
-  showError("Cannot reach the API. Make sure the backend is running on port 3001.");
-}
   });
 
-  return; 
+  return;
 }
   // STEP 2: full result UI
   const reasons = (data.reasons || []).map((r) => `<li>${r}</li>`).join("");
@@ -689,7 +685,7 @@ document.getElementById("demoOnco")?.addEventListener("click", () => {
     "Mother breast cancer at 45, maternal aunt ovarian cancer at 52";
   document.getElementById("clinical_notes").value = "Patient requests risk assessment and referral guidance.";
 
-  dsafeSetValue("family_history_red_flags", "");
+  safeSetValue("family_history_red_flags", "");
 
   document.getElementById("pregnancy_status").value = "not_applicable";
   document.getElementById("gestational_weeks").value = "";
