@@ -81,6 +81,12 @@ function csvToList(value) {
     .filter(Boolean);
 }
 
+function safeSetValue(id, value) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.value = value;
+}
+
 function showError(msg) {
   const el = document.getElementById("form_error");
   if (!el) return;
@@ -425,20 +431,73 @@ function downloadSummaryAsPDF(text) {
   doc.save(`referral_summary_${label}.pdf`);
 }
 
-function demoDecisionForPathway(pathway) {
+function demoStep1(pathway) {
   const p = String(pathway || "").toLowerCase();
-
-  const commonDisclaimer =
-    "Educational demo only. This does not replace clinical judgment. Consider local referral guidelines and urgent red flags.";
 
   if (p === "oncogenetics") {
     return {
       pathway: "oncogenetics",
-      triage: "refer_high",
-      priority_score: 88,
+      triage: "pending_confirmation",
+      priority_score: null,
+      suggested_flags: [
+        "Early-onset cancer (<50 years)",
+        "Multiple related cancers in the family",
+        "Ovarian cancer in family",
+      ],
+      disclaimer: "Demo: physician confirms detected flags before scoring.",
+      llm_explanation:
+        "DEMO GenAI: DARA extracted possible hereditary cancer indicators from the provided history. Please confirm the relevant red flags to compute the final score and referral recommendation.",
+    };
+  }
+
+  if (p === "prenatal") {
+    return {
+      pathway: "prenatal",
+      triage: "pending_confirmation",
+      priority_score: null,
+      suggested_flags: [
+        "Increased nuchal translucency (NT)",
+        "Previous pregnancy with trisomy 21",
+        "Multiple concerning prenatal markers",
+      ],
+      disclaimer: "Demo: physician confirms detected flags before scoring.",
+      llm_explanation:
+        "DEMO GenAI: DARA detected time-sensitive prenatal red flags. Please confirm the relevant flags to compute the final score and next steps.",
+    };
+  }
+
+  return {
+    pathway: "pediatric",
+    triage: "pending_confirmation",
+    priority_score: null,
+    suggested_flags: [
+      "Developmental delay",
+      "Seizures",
+      "Regression or multisystem involvement",
+    ],
+    disclaimer: "Demo: physician confirms detected flags before scoring.",
+    llm_explanation:
+      "DEMO GenAI: DARA detected pediatric red flags compatible with a possible genetic condition. Please confirm the relevant flags to compute the final recommendation.",
+  };
+}
+
+function demoStep2FromConfirmed(pathway, confirmedFlags) {
+  const p = String(pathway || "").toLowerCase();
+
+  // simple scoring demo: 20 points per flag (cap at 100)
+  const score = Math.min(100, (confirmedFlags?.length || 0) * 20 + 40);
+
+  const commonDisclaimer =
+    "Educational demo only. This does not replace clinical judgment.";
+
+  if (p === "oncogenetics") {
+    return {
+      pathway: "oncogenetics",
+      triage: score >= 80 ? "refer_high" : "refer_moderate",
+      priority_score: score,
       reasons: [
-        "Family history suggests a possible hereditary cancer syndrome.",
-        "Referral supports targeted testing and prevention planning.",
+        "Confirmed hereditary cancer red flags increase suspicion for a genetic syndrome.",
+        "Referral supports testing strategy and prevention planning.",
       ],
       missing_info: [
         "Exact cancer types and ages of diagnosis in relatives",
@@ -449,9 +508,11 @@ function demoDecisionForPathway(pathway) {
         "Collect a 3-generation pedigree",
         "Review pathology reports and consider guideline-based testing",
       ],
+      disclaimer: commonDisclaimer,
       llm_explanation:
-        "DEMO GenAI: Based on early onset and clustering of related cancers, a hereditary cancer syndrome is possible. Referral to oncogenetics helps confirm eligibility for testing and plan screening and prevention. " +
+        "DEMO GenAI: After confirming key red flags, DARA recommends referral to oncogenetics. Genetic counseling can clarify testing eligibility, interpret results, and guide surveillance for the patient and relatives. " +
         commonDisclaimer,
+      used_flags: confirmedFlags || [],
     };
   }
 
@@ -459,34 +520,35 @@ function demoDecisionForPathway(pathway) {
     return {
       pathway: "prenatal",
       triage: "refer_urgent",
-      priority_score: 92,
+      priority_score: Math.max(score, 85),
       reasons: [
-        "Abnormal ultrasound finding plus prior trisomy pregnancy increases genetic risk.",
-        "Genetic counseling can clarify the most appropriate test and timing.",
+        "Confirmed prenatal red flags indicate increased chromosomal/genetic risk.",
+        "Prenatal cases are time-sensitive; referral supports prompt testing decisions.",
       ],
       missing_info: [
         "Exact NT measurement and gestational age at scan",
         "Screening results (NIPT / serum screening)",
-        "Detailed ultrasound report and any additional anomalies",
+        "Detailed ultrasound report",
       ],
       next_steps: [
         "Urgent referral to prenatal genetics",
         "Bring ultrasound + screening results",
         "Discuss diagnostic options (CVS/amniocentesis) when appropriate",
       ],
+      disclaimer: commonDisclaimer,
       llm_explanation:
-        "DEMO GenAI: Because the case includes abnormal prenatal markers and a prior trisomy 21 pregnancy, DARA recommends urgent referral. A genetics consult supports shared decision-making on NIPT vs invasive testing and explains limits/benefits. " +
+        "DEMO GenAI: With confirmed time-sensitive prenatal red flags, DARA recommends urgent referral. A genetics consult supports shared decision-making on NIPT vs invasive testing and explains benefits/limits. " +
         commonDisclaimer,
+      used_flags: confirmedFlags || [],
     };
   }
 
-  // pediatric (default)
   return {
     pathway: "pediatric",
-    triage: "refer_moderate_high",
-    priority_score: 80,
+    triage: score >= 80 ? "refer_moderate_high" : "refer_moderate",
+    priority_score: score,
     reasons: [
-      "Developmental delay with seizures can be a genetic presentation.",
+      "Confirmed pediatric red flags can indicate an underlying genetic condition.",
       "Genetic evaluation may improve diagnosis and management.",
     ],
     missing_info: [
@@ -499,11 +561,14 @@ function demoDecisionForPathway(pathway) {
       "Consider chromosomal microarray / epilepsy panel / exome as appropriate",
       "Coordinate neurology follow-up and review imaging/EEG",
     ],
+    disclaimer: commonDisclaimer,
     llm_explanation:
-      "DEMO GenAI: Developmental delay plus seizures is a common indication for genetics referral. Testing can identify an underlying syndrome and guide management and recurrence risk counseling. " +
+      "DEMO GenAI: After confirming key red flags, DARA recommends referral. Testing can identify an underlying diagnosis and guide care and recurrence-risk counseling. " +
       commonDisclaimer,
+    used_flags: confirmedFlags || [],
   };
 }
+
 
 function renderDemoToExistingUI(data) {
   // Use your existing renderResult UI (STEP 2 format)
@@ -604,7 +669,7 @@ document.getElementById("demoOnco")?.addEventListener("click", () => {
     "Mother breast cancer at 45, maternal aunt ovarian cancer at 52";
   document.getElementById("clinical_notes").value = "Patient requests risk assessment and referral guidance.";
 
-  document.getElementById("family_history_red_flags").value = "";
+  dsafeSetValue("family_history_red_flags", "");
 
   document.getElementById("pregnancy_status").value = "not_applicable";
   document.getElementById("gestational_weeks").value = "";
@@ -637,7 +702,7 @@ document.getElementById("demoPrenatal")?.addEventListener("click", () => {
     "Ultrasound anomaly reported. Increased nuchal translucency. Previous pregnancy with trisomy 21.";
 
   document.getElementById("family_history_summary").value = "Previous pregnancy affected by Down syndrome (T21).";
-  document.getElementById("family_history_red_flags").value = "";
+  safeSetValue("family_history_red_flags", "");
 
   document.getElementById("pediatric_red_flags").value = "";
   document.getElementById("hpo_terms").value = "";
@@ -663,7 +728,7 @@ document.getElementById("demoPediatric")?.addEventListener("click", () => {
   document.getElementById("hpo_terms").value = "HP:0001263, HP:0001250";
 
   document.getElementById("family_history_summary").value = "No similar cases reported.";
-  document.getElementById("family_history_red_flags").value = "";
+  safeSetValue("family_history_red_flags", "");
   document.getElementById("prenatal_findings").value = "";
   document.getElementById("pregnancy_status").value = "not_applicable";
   document.getElementById("gestational_weeks").value = "";
