@@ -1,5 +1,7 @@
 // app.js  auto-detect flags + physician confirms via checkboxes
-const API_BASE = "http://localhost:3001";
+const IS_VERCEL = window.location.hostname.includes("vercel.app");
+const API_BASE = IS_VERCEL ? "" : "http://localhost:3001";
+
 
 const pathwayEl = document.getElementById("pathway");
 const prenatalSection = document.getElementById("prenatal_section");
@@ -423,6 +425,104 @@ function downloadSummaryAsPDF(text) {
   doc.save(`referral_summary_${label}.pdf`);
 }
 
+function demoDecisionForPathway(pathway) {
+  const p = String(pathway || "").toLowerCase();
+
+  const commonDisclaimer =
+    "Educational demo only. This does not replace clinical judgment. Consider local referral guidelines and urgent red flags.";
+
+  if (p === "oncogenetics") {
+    return {
+      pathway: "oncogenetics",
+      triage: "refer_high",
+      priority_score: 88,
+      reasons: [
+        "Family history suggests a possible hereditary cancer syndrome.",
+        "Referral supports targeted testing and prevention planning.",
+      ],
+      missing_info: [
+        "Exact cancer types and ages of diagnosis in relatives",
+        "Pathology / tumor characteristics (if available)",
+      ],
+      next_steps: [
+        "Refer to oncogenetics / genetic counseling",
+        "Collect a 3-generation pedigree",
+        "Review pathology reports and consider guideline-based testing",
+      ],
+      llm_explanation:
+        "DEMO GenAI: Based on early onset and clustering of related cancers, a hereditary cancer syndrome is possible. Referral to oncogenetics helps confirm eligibility for testing and plan screening and prevention. " +
+        commonDisclaimer,
+    };
+  }
+
+  if (p === "prenatal") {
+    return {
+      pathway: "prenatal",
+      triage: "refer_urgent",
+      priority_score: 92,
+      reasons: [
+        "Abnormal ultrasound finding plus prior trisomy pregnancy increases genetic risk.",
+        "Genetic counseling can clarify the most appropriate test and timing.",
+      ],
+      missing_info: [
+        "Exact NT measurement and gestational age at scan",
+        "Screening results (NIPT / serum screening)",
+        "Detailed ultrasound report and any additional anomalies",
+      ],
+      next_steps: [
+        "Urgent referral to prenatal genetics",
+        "Bring ultrasound + screening results",
+        "Discuss diagnostic options (CVS/amniocentesis) when appropriate",
+      ],
+      llm_explanation:
+        "DEMO GenAI: Because the case includes abnormal prenatal markers and a prior trisomy 21 pregnancy, DARA recommends urgent referral. A genetics consult supports shared decision-making on NIPT vs invasive testing and explains limits/benefits. " +
+        commonDisclaimer,
+    };
+  }
+
+  // pediatric (default)
+  return {
+    pathway: "pediatric",
+    triage: "refer_moderate_high",
+    priority_score: 80,
+    reasons: [
+      "Developmental delay with seizures can be a genetic presentation.",
+      "Genetic evaluation may improve diagnosis and management.",
+    ],
+    missing_info: [
+      "Growth parameters (height/weight/HC percentiles)",
+      "Key physical exam findings / dysmorphology",
+      "Prior tests (EEG/MRI/metabolic) and results",
+    ],
+    next_steps: [
+      "Refer to pediatric genetics",
+      "Consider chromosomal microarray / epilepsy panel / exome as appropriate",
+      "Coordinate neurology follow-up and review imaging/EEG",
+    ],
+    llm_explanation:
+      "DEMO GenAI: Developmental delay plus seizures is a common indication for genetics referral. Testing can identify an underlying syndrome and guide management and recurrence risk counseling. " +
+      commonDisclaimer,
+  };
+}
+
+function renderDemoToExistingUI(data) {
+  // Use your existing renderResult UI (STEP 2 format)
+  lastPayload = lastPayload || buildPayloadFromForm();
+  lastResponse = data;
+
+  // Ensure "result" box shows
+  document.getElementById("result_empty")?.classList.add("hidden");
+  document.getElementById("result")?.classList.remove("hidden");
+
+  // Render with your existing renderer
+  renderResult(data);
+
+  // Fill GenAI area
+  if (llmExplanationEl) llmExplanationEl.textContent = data.llm_explanation || "";
+  if (llmSection) llmSection.classList.remove("hidden");
+}
+
+
 // -------------------------
 // Actions
 // -------------------------
@@ -434,6 +534,14 @@ document.getElementById("submitBtn")?.addEventListener("click", async () => {
   const err = validatePayload(payload);
   if (err) {
     showError(err);
+    return;
+  }
+
+    // DEMO MODE on Vercel: do not call localhost API
+  if (IS_VERCEL) {
+    const pathway = payload.pathway; // already in payload
+    const decision = demoDecisionForPathway(pathway);
+    renderDemoToExistingUI(decision);
     return;
   }
 
