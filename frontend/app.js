@@ -323,10 +323,14 @@ function renderResult(data) {
       lastResponse = step2;
       renderResult(step2);
       if (llmExplanationEl) llmExplanationEl.textContent = step2.llm_explanation || "";
+      
+      if (llmSection) {
+        llmSection.style.display = "block";
+      } 
       return;
     }
 
-  // ✅ Local: real backend call
+  // Local: real backend call
     try {
       const res = await fetch(`${API_BASE}/cases`, {
         method: "POST",
@@ -718,6 +722,9 @@ document.getElementById("submitBtn")?.addEventListener("click", async () => {
   // Fill GenAI box
     if (llmExplanationEl) llmExplanationEl.textContent = step1.llm_explanation || "";
 
+    if (llmSection) {
+    llmSection.style.display = "block"; 
+    }
     return;
   }
   try {
