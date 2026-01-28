@@ -759,23 +759,6 @@ document.getElementById("downloadSummary")?.addEventListener("click", () => {
         commonDisclaimer,
     };
   }
-  
-  function runDemoFallback() {
-    const decision = demoDecision(getPathway());
-    renderResult(decision);
-
-    // Also fill the existing LLM UI box if it exists
-    if (llmExplanationEl) {
-      llmExplanationEl.textContent = decision.genai_explanation || "";
-    }
-    if (llmSection) {
-      llmSection.style.display = "";
-      llmSection.classList.remove("hidden");
-    }
-
-    // Hide the normal "summary_actions" because demo does not generate PDF summary from API
-    document.getElementById("summary_actions")?.classList.add("hidden");
-  }
 
   // ---- 6) Render in Assessment Result
   function renderResult(decision) {
@@ -850,4 +833,12 @@ document.getElementById("downloadSummary")?.addEventListener("click", () => {
         return;
       }
 
-      // If the above doesn't fail (rare), st
+      // If the above doesn't fail (rare), still show demo so the UI always shows something on Vercel
+      const decision = demoDecision(pathway);
+      renderResult(decision);
+    },
+    true
+  );
+
+  console.log("[DEMO MODE] Enabled. If backend is not deployed, results will still display.");
+})();
